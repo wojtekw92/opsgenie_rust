@@ -6,10 +6,30 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
-struct AlertCreateResponse {
-    result: String,
+struct AlertCreateResponse<T> {
+    result: T,
     took: f32,
     request_id: String,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+struct AlertStatusResponse<T> {
+    data: T,
+    took: f32,
+    request_id: String,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct AlertStatus {
+    pub success: bool,
+    pub action: String,
+    pub processed_at: String,
+    pub integration_id: String,
+    pub is_success: bool,
+    pub status: String,
+    pub alert_id: String,
+    pub alias: String,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -79,8 +99,12 @@ pub struct AlertData {
     pub note: Option <String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Alert {
     request_id: String,
+    key: String,
+    alert_status: Option<AlertStatus>,
+
 }
 impl Alert {
     pub fn create(key: String, data: AlertData) -> Result<Alert, reqwest::Error> {
@@ -90,10 +114,21 @@ impl Alert {
             .header(AUTHORIZATION, format!("GenieKey {}", key))
             .json(&data)
             .send()?;
-         let resp: AlertCreateResponse = response.json()?;
-         println!("{:?}", resp);
+        let resp: AlertCreateResponse<String> = response.json()?;
         Ok(Alert {
             request_id: resp.request_id,
+            key: key.clone(),
+            alert_status: None,
         })
+    }
+    pub fn status(&mut self) -> Result<AlertStatus, reqwest::Error> {
+        let request_url=format!("https://api.opsgenie.com/v2/alerts/requests/{}", self.request_id);
+        let mut response = Client::new()
+            .get(&request_url)
+            .header(AUTHORIZATION, format!("GenieKey {}", self.key))
+            .send()?;
+            let resp: AlertStatusResponse<AlertStatus> = response.json()?;
+            self.alert_status = Some(resp.data.clone());
+            Ok(resp.data)
     }
 }
