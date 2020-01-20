@@ -3,11 +3,16 @@ use reqwest::Client;
 use reqwest::header::AUTHORIZATION;
 use serde::{Serialize, Deserialize};
 
+use serde_json::json;
+
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 struct AlertCreateResponse<T> {
-    result: T,
+    #[serde(skip_serializing_if="Option::is_none")]
+    result: Option<T>,
+    #[serde(skip_serializing_if="Option::is_none")]
+    message: Option<String>,
     took: f32,
     request_id: String,
 }
@@ -81,7 +86,7 @@ pub struct AlertData {
     pub tags: Option<Vec<String>>,
     /// Map of key-value pairs to use as custom properties of the alert.
     #[serde(skip_serializing_if="Option::is_none")]
-    pub details: Option <String>, // TODO: that should be key value pair.
+    pub details: Option <String>, // TODO: that should be key value pair.(Use HashMap)
     /// Entity field of the alert that is generally used to specify which domain alert is related to.
     #[serde(skip_serializing_if="Option::is_none")]
     pub entity: Option <String>,
@@ -98,6 +103,46 @@ pub struct AlertData {
     #[serde(skip_serializing_if="Option::is_none")]
     pub note: Option <String>,
 }
+impl AlertData {
+    pub fn new(message: String) -> AlertData {
+        AlertData {
+            message: message.clone(),
+            alias: None,
+            description: None,
+            responders: None,
+            visible_to: None,
+            actions: None,
+            tags: None,
+            details: None,
+            entity: None,
+            source: None,
+            priority: None,
+            user: None,
+            note: None,
+        }
+    }
+    pub fn alias(mut self, alias: String) -> AlertData {
+        self.alias = Some(alias.clone());
+        self
+    }
+
+    pub fn tags(mut self, tags: Vec<String>) -> AlertData {
+        self.tags = Some(tags.clone());
+        self
+    }
+    pub fn entity(mut self, entity: String) -> AlertData {
+        self.entity = Some(entity);
+        self
+    }
+    pub fn source(mut self, source: String) -> AlertData {
+        self.source = Some(source.clone());
+        self
+    }
+    pub fn priority(mut self, priority: Priority) -> AlertData {
+        self.priority = Some(priority);
+        self
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Alert {
@@ -107,7 +152,7 @@ pub struct Alert {
 
 }
 impl Alert {
-    pub fn create(key: String, data: AlertData) -> Result<Alert, reqwest::Error> {
+    pub fn create(key: &String, data: AlertData) -> Result<Alert, reqwest::Error> {
         let request_url="https://api.opsgenie.com/v2/alerts";
         let mut response = Client::new()
             .post(request_url)
@@ -121,14 +166,30 @@ impl Alert {
             alert_status: None,
         })
     }
-    pub fn status(&mut self) -> Result<AlertStatus, reqwest::Error> {
+    pub fn status(mut self) -> Result<Option<AlertStatus>, reqwest::Error> {
         let request_url=format!("https://api.opsgenie.com/v2/alerts/requests/{}", self.request_id);
         let mut response = Client::new()
             .get(&request_url)
             .header(AUTHORIZATION, format!("GenieKey {}", self.key))
             .send()?;
             let resp: AlertStatusResponse<AlertStatus> = response.json()?;
-            self.alert_status = Some(resp.data.clone());
-            Ok(resp.data)
+            self.alert_status = Some(resp.data);
+            Ok(self.alert_status)
+    }
+    pub fn close(&mut self) -> Result <(), reqwest::Error> {
+        let request_url=format!("https://api.opsgenie.com/v2/alerts/requests/{}", self.request_id);
+        let mut response = Client::new()
+            .get(&request_url)
+            .header(AUTHORIZATION, format!("GenieKey {}", self.key))
+            .send()?;
+        let resp: AlertStatusResponse<AlertStatus> = response.json()?;
+        let request_url=format!("https://api.opsgenie.com/v2/alerts/{}/close", resp.data.alert_id);
+        Client::new()
+            .post(&request_url)
+            .header(AUTHORIZATION, format!("GenieKey {}", self.key))
+            .json(&json!({}))
+            .send()?;
+
+        Ok(())
     }
 }
