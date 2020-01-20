@@ -1,10 +1,19 @@
 [package]
-name = "opsgenie_rust"
-version = "0.1.0"
+name = "opsgenie"
+version = "0.0.1"
 authors = ["wojtekw92 <wwozniak92@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Simple client library for creating and closing alerts on opsgenie"
+
+homepage = "https://github.com/wojtekw92/opsgenie_rust/blob/master/README.md"
+repository = "https://github.com/wojtekw92/opsgenie_rust"
+
+readme = "README.md"
+keywords = ["opsgenie", "alert"]
+categories = ["development-tools", "api-bindings"]
+
+license = "MIT"
 
 [dependencies]
 reqwest = "0.9.22"
